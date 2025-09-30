@@ -8,9 +8,15 @@ struct AddCategoryView: View {
     @State private var icon: String = "❓"
     @State private var type: CategoryType = .need
 
+    var onCategoryAdded: ((Category) -> Void)?
+
     private var isFormValid: Bool {
         !name.trimmingCharacters(in: .whitespaces).isEmpty &&
         !icon.trimmingCharacters(in: .whitespaces).isEmpty
+    }
+    
+    init(onCategoryAdded: ((Category) -> Void)? = nil) {
+        self.onCategoryAdded = onCategoryAdded
     }
 
     var body: some View {
@@ -27,15 +33,16 @@ struct AddCategoryView: View {
                 }
                 
                 Section(header: Text("Icon")) {
-                    TextField("Emoji Icon", text: $icon)
-                        .font(.largeTitle)
-                        .multilineTextAlignment(.center)
-                        .onChange(of: icon) { oldValue, newValue in
-                            // Keep only the first emoji if multiple are entered
-                            if newValue.count > 1 {
-                                icon = String(newValue.prefix(1))
+                    HStack {
+                        TextField("Emoji Icon", text: $icon)
+                            .font(.largeTitle)
+                            .multilineTextAlignment(.center)
+                            .onChange(of: icon) { oldValue, newValue in
+                                if newValue.count > 1 {
+                                    icon = String(newValue.prefix(1))
+                                }
                             }
-                        }
+                    }
                 }
             }
             .navigationTitle("New Category")
@@ -53,8 +60,9 @@ struct AddCategoryView: View {
     }
 
     private func saveCategory() {
-        let newCategory = Category(name: name, type: type, iconName: icon, colorHex: "#000000") // colorHex is unused for now
+        let newCategory = Category(name: name, type: type, iconName: icon, colorHex: "#000000")
         modelContext.insert(newCategory)
+        onCategoryAdded?(newCategory)
         dismiss()
     }
 }

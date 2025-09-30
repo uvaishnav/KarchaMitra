@@ -1,10 +1,8 @@
-
 import Foundation
 import SwiftData
 
 @Model
 final class Expense {
-    @Attribute(.unique) var id: UUID
     var amount: Double
     var date: Date
     var time: Date
@@ -14,9 +12,9 @@ final class Expense {
     var isShared: Bool
     @Relationship(deleteRule: .cascade) var sharedParticipants: [SharedParticipant]
     var createdAt: Date
+    var recurringTemplate: RecurringExpenseTemplate?
 
-    init(id: UUID = UUID(), amount: Double, date: Date, time: Date, category: Category? = nil, reason: String? = nil, isRecurring: Bool = false, isShared: Bool = false, sharedParticipants: [SharedParticipant] = [], createdAt: Date = .now) {
-        self.id = id
+    init(amount: Double, date: Date, time: Date, category: Category? = nil, reason: String? = nil, isRecurring: Bool = false, isShared: Bool = false, sharedParticipants: [SharedParticipant] = [], createdAt: Date = .now, recurringTemplate: RecurringExpenseTemplate? = nil) {
         self.amount = amount
         self.date = date
         self.time = time
@@ -26,7 +24,6 @@ final class Expense {
         self.isShared = isShared
         self.sharedParticipants = sharedParticipants
         self.createdAt = createdAt
+        self.recurringTemplate = recurringTemplate
     }
-
-    // Placeholder for shared expense calculation logic
 }

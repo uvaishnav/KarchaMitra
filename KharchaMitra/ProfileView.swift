@@ -27,6 +27,10 @@ struct ProfileView: View {
                         Label("Categories", systemImage: "list.bullet")
                     }
                     
+                    NavigationLink(destination: RecurringPaymentsListView()) {
+                        Label("Recurring Payments", systemImage: "arrow.2.circlepath")
+                    }
+                    
                     NavigationLink(destination: SettingsView()) {
                         Label("Settings", systemImage: "gearshape.fill")
                     }

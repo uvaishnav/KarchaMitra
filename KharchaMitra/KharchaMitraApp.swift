@@ -10,6 +10,8 @@ import SwiftData
 
 @main
 struct KharchaMitraApp: App {
+    
+    
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
             Expense.self,
@@ -17,6 +19,7 @@ struct KharchaMitraApp: App {
             SharedParticipant.self,
             UserSettings.self,
             Settlement.self,
+            RecurringExpenseTemplate.self,
         ])
         let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
 
@@ -30,6 +33,7 @@ struct KharchaMitraApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
+                
         }
         .modelContainer(sharedModelContainer)
     }

@@ -37,14 +37,16 @@ struct EditCategoryView: View {
                 }
                 
                 Section(header: Text("Icon")) {
-                    TextField("Emoji Icon", text: $icon)
-                        .font(.largeTitle)
-                        .multilineTextAlignment(.center)
-                        .onChange(of: icon) { oldValue, newValue in
-                            if newValue.count > 1 {
-                                icon = String(newValue.prefix(1))
+                    HStack {
+                        TextField("Emoji Icon", text: $icon)
+                            .font(.largeTitle)
+                            .multilineTextAlignment(.center)
+                            .onChange(of: icon) { oldValue, newValue in
+                                if newValue.count > 1 {
+                                    icon = String(newValue.prefix(1))
+                                }
                             }
-                        }
+                    }
                 }
                 
                 Section {

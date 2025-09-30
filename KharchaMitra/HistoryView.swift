@@ -6,7 +6,7 @@ enum HistoryItem: Identifiable, Hashable {
     case expense(Expense)
     case settlement(Settlement)
 
-    var id: UUID {
+    var id: AnyHashable {
         switch self {
         case .expense(let e):
             return e.id
@@ -42,6 +42,13 @@ struct HistoryView: View {
     @State private var endDate = Date()
     @State private var showingFilters = true // Show by default
 
+    @State private var selectedMonth: Int = Calendar.current.component(.month, from: Date())
+    @State private var selectedYear: Int = Calendar.current.component(.year, from: Date())
+
+    // State for the CSV export
+    @State private var isShareSheetPresented = false
+    @State private var csvURL: URL? = nil
+
     private var combinedItems: [HistoryItem] {
         let expenseItems = expenses.map { HistoryItem.expense($0) }
         let settlementItems = settlements.map { HistoryItem.settlement($0) }
@@ -54,12 +61,13 @@ struct HistoryView: View {
             return combinedItems
         case .month:
             return combinedItems.filter {
-                Calendar.current.isDate($0.date, equalTo: selectedDate, toGranularity: .month) &&
-                Calendar.current.isDate($0.date, equalTo: selectedDate, toGranularity: .year)
+                let monthMatch = Calendar.current.isDate($0.date, equalTo: selectedDate, toGranularity: .month)
+                let yearMatch = Calendar.current.isDate($0.date, equalTo: selectedDate, toGranularity: .year)
+                return monthMatch && yearMatch
             }
         case .year:
             return combinedItems.filter {
-                Calendar.current.isDate($0.date, equalTo: selectedDate, toGranularity: .year)
+                Calendar.current.component(.year, from: $0.date) == selectedYear
             }
         case .dateRange:
             // Adjust endDate to be the end of the selected day
@@ -77,15 +85,38 @@ struct HistoryView: View {
                 DisclosureGroup("Filters", isExpanded: $showingFilters) {
                     VStack {
                         Picker("Filter By", selection: $filterType.animation()) {
-                            ForEach(FilterType.allCases, id: \.self) { type in
-                                Text(type.rawValue).tag(type)
+                            ForEach(FilterType.allCases, id: \.self) {
+                                Text($0.rawValue).tag($0)
                             }
                         }
                         .pickerStyle(.segmented)
 
-                        if filterType == .month || filterType == .year {
-                            DatePicker("Select Date", selection: $selectedDate, displayedComponents: .date)
-                                .datePickerStyle(.compact)
+                        if filterType == .month {
+                            HStack {
+                                Picker("Month", selection: $selectedMonth) {
+                                    ForEach(1...12, id: \.self) {
+                                        Text(Calendar.current.monthSymbols[$0 - 1]).tag($0)
+                                    }
+                                }
+                                .pickerStyle(.menu)
+
+                                Picker("Year", selection: $selectedYear) {
+                                    ForEach(((Calendar.current.component(.year, from: Date()) - 10)...(Calendar.current.component(.year, from: Date()))).reversed(), id: \.self) {
+                                        Text(String($0)).tag($0)
+                                    }
+                                }
+                                .pickerStyle(.menu)
+                            }
+                            .onChange(of: selectedMonth) { updateSelectedDateFromComponents() }
+                            .onChange(of: selectedYear) { updateSelectedDateFromComponents() }
+                        } else if filterType == .year {
+                            Picker("Select Year", selection: $selectedYear) {
+                                ForEach(((Calendar.current.component(.year, from: Date()) - 10)...(Calendar.current.component(.year, from: Date()))).reversed(), id: \.self) {
+                                    Text(String($0)).tag($0)
+                                }
+                            }
+                            .pickerStyle(.menu)
+                            .onChange(of: selectedYear) { updateSelectedDateFromComponents() }
                         }
 
                         if filterType == .dateRange {
@@ -112,7 +143,28 @@ struct HistoryView: View {
                 }
             }
             .navigationTitle("History")
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Export", systemImage: "square.and.arrow.up", action: generateAndShareCSV)
+                }
+            }
+            .sheet(isPresented: $isShareSheetPresented) {
+                if let csvURL = csvURL {
+                    ShareSheet(activityItems: [csvURL])
+                }
+            }
+            .onAppear(perform: setupInitialDate)
         }
+    }
+
+    private func setupInitialDate() {
+        selectedMonth = Calendar.current.component(.month, from: selectedDate)
+        selectedYear = Calendar.current.component(.year, from: selectedDate)
+    }
+
+    private func updateSelectedDateFromComponents() {
+        let components = DateComponents(year: selectedYear, month: selectedMonth)
+        selectedDate = Calendar.current.date(from: components) ?? Date()
     }
 
     @ViewBuilder
@@ -193,7 +245,43 @@ struct HistoryView: View {
             .padding(.vertical, 4)
         }
     }
+    
+    private func generateAndShareCSV() {
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd"
+        let fileName = "KharchaMitra_Export_\(dateFormatter.string(from: Date())).csv"
+        let fileURL = FileManager.default.temporaryDirectory.appendingPathComponent(fileName)
+        
+        var csvText = "Date,Type,Amount,Category,Reason,Participant\n"
+        
+        for item in filteredItems {
+            let date = dateFormatter.string(from: item.date)
+            
+            switch item {
+            case .expense(let expense):
+                let amount = "-\(expense.amount)"
+                let category = expense.category?.name ?? "N/A"
+                let reason = expense.reason?.replacingOccurrences(of: ",", with: "") ?? ""
+                csvText.append("\(date),Expense,\(amount)," + category + "," + reason + "\n")
+            case .settlement(let settlement):
+                let amount = "+\(settlement.amount)"
+                let participant = settlement.participantName
+                csvText.append("\(date),Settlement,\(amount),N/A,Payment from \(participant),\(participant)\n")
+            }
+        }
+        
+        do {
+            try csvText.write(to: fileURL, atomically: true, encoding: .utf8)
+            self.csvURL = fileURL
+            self.isShareSheetPresented = true
+        } catch {
+            print("Failed to create CSV file: \(error.localizedDescription)")
+        }
+    }
 }
+
+
+
 
 #Preview {
     HistoryView()

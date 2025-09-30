@@ -1,4 +1,3 @@
-
 import SwiftUI
 import SwiftData
 
@@ -30,40 +29,24 @@ struct UnsettledPaysView: View {
     }
     
     var body: some View {
-        VStack(alignment: .leading) {
-            Text("Unsettled Shared Expenses")
-                .font(.title2)
-                .fontWeight(.semibold)
-                .padding(.bottom, 5)
-
-            if aggregatedDebts.isEmpty {
-                Text("No unsettled expenses yet.")
-                    .foregroundColor(.secondary)
-                    .padding()
-                    .frame(maxWidth: .infinity)
-                    .background(Color(.secondarySystemBackground))
-                    .cornerRadius(10)
-            } else {
-                VStack(spacing: 10) {
-                    ForEach(aggregatedDebts) { debt in
-                        NavigationLink(destination: DebtDetailView(participantName: debt.name)) {
-                            HStack {
-                                Image(systemName: "person.circle.fill")
-                                    .font(.headline)
-                                    .foregroundColor(.secondary)
-                                Text(debt.name)
-                                Spacer()
-                                Text(debt.amountOwed.toCurrency())
-                                    .fontWeight(.semibold)
-                                    .foregroundColor(.orange)
-                            }
-                            .padding()
-                            .background(Color(.secondarySystemBackground))
-                            .cornerRadius(10)
-                        }
-                        .buttonStyle(PlainButtonStyle())
+        if aggregatedDebts.isEmpty {
+            Text("No unsettled expenses yet.")
+                .foregroundColor(.secondary)
+        } else {
+            ForEach(aggregatedDebts) { debt in
+                NavigationLink(destination: DebtDetailView(participantName: debt.name)) {
+                    HStack {
+                        Image(systemName: "person.circle.fill")
+                            .font(.headline)
+                            .foregroundColor(.secondary)
+                        Text(debt.name)
+                        Spacer()
+                        Text(debt.amountOwed.toCurrency())
+                            .fontWeight(.semibold)
+                            .foregroundColor(.orange)
                     }
                 }
+                .buttonStyle(PlainButtonStyle())
             }
         }
     }

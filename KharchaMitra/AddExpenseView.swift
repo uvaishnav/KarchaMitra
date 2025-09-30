@@ -1,4 +1,3 @@
-
 import SwiftUI
 import SwiftData
 
@@ -20,16 +19,10 @@ struct AddExpenseView: View {
     @State private var showingContactPicker = false
     @State private var showingAddCategorySheet = false
 
-    // State for placeholder scanning UI
-    @State private var isScanning = false
     @State private var showSuccessMessage = false
 
-    // Placeholder services
-    private let receiptScanner = ReceiptScannerService()
-    private let categorySuggester = CategorySuggester()
-
     private var isFormValid: Bool {
-        amount != nil && amount ?? 0 > 0
+        amount != nil && amount ?? 0 > 0 && !reason.trimmingCharacters(in: .whitespaces).isEmpty
     }
     
     init() {}
@@ -38,19 +31,12 @@ struct AddExpenseView: View {
         NavigationView {
             ZStack {
                 Form {
-                    Section {
-                        Button(action: triggerScan) {
-                            HStack {
-                                Image(systemName: "camera.fill")
-                                Text("Scan Receipt")
-                            }
-                        }
-                    }
-
                     Section(header: Text("Expense Details")) {
                         TextField("Amount", value: $amount, format: .currency(code: "INR"))
                             .keyboardType(.decimalPad)
                             .focused($amountFieldIsFocused)
+
+                        TextField("Reason for expense", text: $reason)
 
                         Picker("Category", selection: $selectedCategory) {
                             Text("None").tag(nil as Category?)
@@ -66,10 +52,6 @@ struct AddExpenseView: View {
                         
                         DatePicker("Date", selection: $date, displayedComponents: .date)
                         DatePicker("Time", selection: $date, displayedComponents: .hourAndMinute)
-                    }
-
-                    Section(header: Text("Reason (Optional)")) {
-                        TextField("e.g., Lunch with the team", text: $reason)
                     }
 
                     Section(header: Text("Additional Options")) {
@@ -134,20 +116,14 @@ struct AddExpenseView: View {
                     }
                 }
                 .sheet(isPresented: $showingAddCategorySheet) {
-                    AddCategoryView()
+                    AddCategoryView(onCategoryAdded: { newCategory in
+                        self.selectedCategory = newCategory
+                    })
                 }
                 
                 // Overlays for user feedback
-                if isScanning || showSuccessMessage {
+                if showSuccessMessage {
                     Color.black.opacity(0.4).edgesIgnoringSafeArea(.all)
-                }
-
-                if isScanning {
-                    ProgressView("Scanning...")
-                        .padding()
-                        .background(Color(.systemBackground))
-                        .cornerRadius(10)
-                        .shadow(radius: 10)
                 }
 
                 if showSuccessMessage {
@@ -178,25 +154,6 @@ struct AddExpenseView: View {
         }
     }
 
-    private func triggerScan() {
-        // In a real app, this would present the camera.
-        // For now, we just use the placeholder service.
-        isScanning = true
-        receiptScanner.scanReceipt(image: UIImage()) { extractedData in
-            isScanning = false
-            
-            // Pre-fill form with scanned data
-            self.amount = extractedData.amount
-            self.date = extractedData.date ?? Date()
-            self.reason = extractedData.merchant ?? ""
-            
-            // Attempt to predict category
-            if let merchant = extractedData.merchant {
-                self.selectedCategory = categorySuggester.predictCategory(from: merchant, allCategories: categories)
-            }
-        }
-    }
-
     private func saveExpense() {
         guard let amount = amount else { return }
 
@@ -211,6 +168,15 @@ struct AddExpenseView: View {
             sharedParticipants: sharedParticipants
         )
         modelContext.insert(newExpense)
+
+        if isRecurring {
+            let newTemplate = RecurringExpenseTemplate(
+                amount: amount,
+                category: selectedCategory,
+                reason: reason
+            )
+            modelContext.insert(newTemplate)
+        }
 
         withAnimation {
             showSuccessMessage = true

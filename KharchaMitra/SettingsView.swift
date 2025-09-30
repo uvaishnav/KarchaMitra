@@ -1,4 +1,3 @@
-
 import SwiftUI
 import SwiftData
 
@@ -7,7 +6,6 @@ struct SettingsView: View {
     @Environment(\.modelContext) private var modelContext
 
     @State private var showBackupSheet = false
-    @State private var showRestoreAlert = false
     @State private var backupURL: URL?
 
     var body: some View {
@@ -21,11 +19,6 @@ struct SettingsView: View {
                 Section(header: Text("Data Management")) {
                     Button("Backup Data", systemImage: "arrow.up.doc", action: triggerBackup)
                         .accessibilityHint(Text("Saves a copy of your app data."))
-                    
-                    Button("Restore from Backup", systemImage: "arrow.down.doc.fill", action: {
-                        showRestoreAlert = true
-                    })
-                    .accessibilityHint(Text("Restores your app data from a backup file."))
                 }
             }
             .navigationTitle("Settings")
@@ -33,11 +26,6 @@ struct SettingsView: View {
                 if let backupURL = backupURL {
                     ShareSheet(activityItems: [backupURL])
                 }
-            }
-            .alert("Restore Data", isPresented: $showRestoreAlert) {
-                Button("OK", role: .cancel) { }
-            } message: {
-                Text("Restoring from a backup is a manual process for security reasons. Please contact support or follow the guide on our website.")
             }
         }
     }

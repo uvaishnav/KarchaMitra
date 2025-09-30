@@ -22,7 +22,7 @@ struct CategoriesView: View {
                             VStack(alignment: .leading) {
                                 Text(category.name)
                                     .font(.headline)
-                                Text(category.type == .need ? "Need" : "Want")
+                                Text(category.type.displayName)
                                     .font(.caption)
                                     .foregroundColor(.secondary)
                             }
