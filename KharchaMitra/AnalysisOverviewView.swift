@@ -7,6 +7,9 @@ struct AnalysisOverviewView: View {
     @Query var settings: [UserSettings]
     var isForPDF: Bool = false
 
+    @State private var selectedWantNeedAmount: Double?
+    @State private var selectedRecurringAmount: Double?
+
     private var userSettings: UserSettings {
         settings.first ?? UserSettings()
     }
@@ -37,7 +40,7 @@ struct AnalysisOverviewView: View {
     }
     
     private var monthlySpendingAgainstLimit: Double {
-        let limitedExpenses = monthlyExpenses.filter { $0.category?.type != .UTR }
+        let limitedExpenses = expenses.filter { $0.category?.type != .UTR }
         
         let grossSpent = limitedExpenses.reduce(0) { $0 + $1.amount }
         
@@ -101,8 +104,34 @@ struct AnalysisOverviewView: View {
                             innerRadius: .ratio(0.618)
                         )
                         .foregroundStyle(by: .value("Type", spending.categoryName))
+                        .opacity(selectedWantNeedAmount == nil ? 1.0 : (selectedWantNeedAmount == spending.amount ? 1.0 : 0.5))
                     }
+                    .chartAngleSelection(value: $selectedWantNeedAmount)
                     .frame(height: 250)
+                    .chartBackground {
+                        chartProxy in
+                        GeometryReader { geometry in
+                            if let plotFrame = chartProxy.plotFrame {
+                                let frame = geometry[plotFrame]
+                                VStack {
+                                    if let selectedWantNeedAmount {
+                                        Text("Amount")
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                        Text(selectedWantNeedAmount.toCurrency())
+                                            .font(.headline.weight(.bold))
+                                    } else {
+                                        Text("Total")
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                        Text(totalSpending.toCurrency())
+                                            .font(.headline.weight(.bold))
+                                    }
+                                }
+                                .position(x: frame.midX, y: frame.midY)
+                            }
+                        }
+                    }
                 }
 
                 // Recurring vs One-Time Pie Chart
@@ -113,11 +142,51 @@ struct AnalysisOverviewView: View {
                             innerRadius: .ratio(0.618)
                         )
                         .foregroundStyle(by: .value("Type", spending.name))
+                        .opacity(selectedRecurringAmount == nil ? 1.0 : (selectedRecurringAmount == spending.amount ? 1.0 : 0.5))
                     }
+                    .chartAngleSelection(value: $selectedRecurringAmount)
                     .frame(height: 250)
+                    .chartBackground { chartProxy in
+                        GeometryReader { geometry in
+                            if let plotFrame = chartProxy.plotFrame {
+                                let frame = geometry[plotFrame]
+                                VStack {
+                                    if let selectedRecurringAmount {
+                                        Text("Amount")
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                        Text(selectedRecurringAmount.toCurrency())
+                                            .font(.headline.weight(.bold))
+                                    } else {
+                                        Text("Total")
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                        Text(totalSpending.toCurrency())
+                                            .font(.headline.weight(.bold))
+                                    }
+                                }
+                                .position(x: frame.midX, y: frame.midY)
+                            }
+                        }
+                    }
                 }
             }
         }
         .padding()
+        .onChange(of: selectedWantNeedAmount) { oldValue, newValue in
+            if newValue != nil {
+                hapticFeedback()
+            }
+        }
+        .onChange(of: selectedRecurringAmount) { oldValue, newValue in
+            if newValue != nil {
+                hapticFeedback()
+            }
+        }
+    }
+    
+    private func hapticFeedback() {
+        let impact = UIImpactFeedbackGenerator(style: .light)
+        impact.impactOccurred()
     }
 }

@@ -5,7 +5,7 @@ struct AddCategoryView: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var name: String = ""
-    @State private var icon: String = "❓"
+    @State private var icon: String = ""
     @State private var type: CategoryType = .need
 
     var onCategoryAdded: ((Category) -> Void)?
@@ -33,16 +33,8 @@ struct AddCategoryView: View {
                 }
                 
                 Section(header: Text("Icon")) {
-                    HStack {
-                        TextField("Emoji Icon", text: $icon)
-                            .font(.largeTitle)
-                            .multilineTextAlignment(.center)
-                            .onChange(of: icon) { oldValue, newValue in
-                                if newValue.count > 1 {
-                                    icon = String(newValue.prefix(1))
-                                }
-                            }
-                    }
+                    EmojiTextField(text: $icon, placeholder: "Select Icon")
+                        .multilineTextAlignment(.center)
                 }
             }
             .navigationTitle("New Category")
@@ -60,10 +52,17 @@ struct AddCategoryView: View {
     }
 
     private func saveCategory() {
-        let newCategory = Category(name: name, type: type, iconName: icon, colorHex: "#000000")
+        let newCategory = Category(name: name, type: type, iconName: icon, colorHex: randomHexColor())
         modelContext.insert(newCategory)
         onCategoryAdded?(newCategory)
         dismiss()
+    }
+    
+    private func randomHexColor() -> String {
+        let red = Int.random(in: 0...255)
+        let green = Int.random(in: 0...255)
+        let blue = Int.random(in: 0...255)
+        return String(format: "#%02X%02X%02X", red, green, blue)
     }
 }
 

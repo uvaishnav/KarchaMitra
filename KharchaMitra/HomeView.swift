@@ -3,7 +3,7 @@ import SwiftData
 
 struct HomeView: View {
     @Environment(\.modelContext) private var modelContext
-    @Binding var selectedTab: Int
+    @State private var showingAddExpenseSheet = false
 
     @Query var expenses: [Expense]
     @Query var settings: [UserSettings]
@@ -13,56 +13,36 @@ struct HomeView: View {
         settings.first ?? UserSettings()
     }
 
-    // Renamed from monthlySpent to be more descriptive. Represents total cash flow.
     private var netMonthlyCashFlow: Double {
-        // Get all expenses for the current month
         let monthlyExpenses = expenses.filter { Calendar.current.isDate($0.date, equalTo: Date(), toGranularity: .month) }
-        
-        // Calculate the gross amount spent
         let grossSpent = monthlyExpenses.reduce(0) { $0 + $1.amount }
-        
-        // Calculate the total amount recovered from shared expenses
         let totalRecovered = monthlyExpenses
             .flatMap { $0.sharedParticipants }
             .reduce(0) { $0 + $1.amountPaid }
-            
-        // Net spent is the gross amount minus whatever has been paid back
         return grossSpent - totalRecovered
     }
 
-    // New property to calculate only spending that counts against the limit
     private var monthlySpendingAgainstLimit: Double {
-        // Get all non-UTR expenses for the month
         let limitedExpenses = expenses.filter {
             Calendar.current.isDate($0.date, equalTo: Date(), toGranularity: .month) &&
             $0.category?.type != .UTR
         }
-        
         let grossSpent = limitedExpenses.reduce(0) { $0 + $1.amount }
-        
         let totalRecovered = limitedExpenses
             .flatMap { $0.sharedParticipants }
             .reduce(0) { $0 + $1.amountPaid }
-            
         return grossSpent - totalRecovered
     }
 
     private var limitLeft: Double {
-        // Use the new property for the calculation
         userSettings.expenseLimit - monthlySpendingAgainstLimit
     }
     
     private var lastMonthRecurringTotal: Double {
         let calendar = Calendar.current
-        guard let lastMonth = calendar.date(byAdding: .month, value: -1, to: Date()) else {
-            return 0
-        }
-        guard let startOfLastMonth = calendar.date(from: calendar.dateComponents([.year, .month], from: lastMonth)) else {
-            return 0
-        }
-        guard let startOfThisMonth = calendar.date(from: calendar.dateComponents([.year, .month], from: Date())) else {
-            return 0
-        }
+        guard let lastMonth = calendar.date(byAdding: .month, value: -1, to: Date()) else { return 0 }
+        guard let startOfLastMonth = calendar.date(from: calendar.dateComponents([.year, .month], from: lastMonth)) else { return 0 }
+        guard let startOfThisMonth = calendar.date(from: calendar.dateComponents([.year, .month], from: Date())) else { return 0 }
 
         let lastMonthExpenses = expenses.filter { expense in
             return expense.date >= startOfLastMonth && expense.date < startOfThisMonth && expense.recurringTemplate != nil
@@ -72,9 +52,7 @@ struct HomeView: View {
 
     private var thisMonthRecurringSpent: Double {
         let calendar = Calendar.current
-        guard let startOfMonth = calendar.date(from: calendar.dateComponents([.year, .month], from: Date())) else {
-            return 0
-        }
+        guard let startOfMonth = calendar.date(from: calendar.dateComponents([.year, .month], from: Date())) else { return 0 }
 
         let thisMonthExpenses = expenses.filter { expense in
             return expense.date >= startOfMonth && expense.recurringTemplate != nil
@@ -89,38 +67,51 @@ struct HomeView: View {
         }
         return limitLeft
     }
-    
-    init(selectedTab: Binding<Int>) {
-        _selectedTab = selectedTab
-    }
 
     var body: some View {
         NavigationView {
             ZStack(alignment: .bottomTrailing) {
-                VStack {
+                VStack(spacing: 0) {
                     HeaderView()
-                    
-                    BudgetProgressView(
-                        limit: userSettings.expenseLimit,
-                        spending: monthlySpendingAgainstLimit,
-                        safeLimit: safeLimit,
-                        limitLeft: limitLeft
-                    )
-                    
-                    HStack {
-                        VStack {
-                            Text("Amount Spent")
-                            Text(netMonthlyCashFlow.toCurrency()).foregroundColor(.red)
-                        }
-                        Spacer()
-                        VStack {
-                            Text("Saving Buffer")
-                            Text(userSettings.savingBuffer.toCurrency()).foregroundColor(.blue)
-                        }
-                    }
-                    .padding()
+                        .padding(.horizontal)
 
                     List {
+                        BudgetProgressView(
+                            limit: userSettings.expenseLimit,
+                            spending: monthlySpendingAgainstLimit,
+                            safeLimit: safeLimit,
+                            limitLeft: limitLeft
+                        )
+
+                        DashboardCard {
+                            HStack {
+                                VStack(alignment: .leading) {
+                                    Text("Amount Spent")
+                                        .font(.headline)
+                                        .fontWeight(.medium)
+                                    Text(netMonthlyCashFlow.toCurrency())
+                                        .font(.system(size: 28, weight: .semibold, design: .rounded))
+                                        .foregroundColor(.red)
+                                }
+                                Spacer()
+                                VStack(alignment: .trailing) {
+                                    Text("Saving Buffer")
+                                        .font(.headline)
+                                        .fontWeight(.medium)
+                                    Text(userSettings.savingBuffer.toCurrency())
+                                        .font(.system(size: 28, weight: .semibold, design: .rounded))
+                                        .foregroundColor(.blue)
+                                }
+                            }
+                            .padding()
+                        }
+                        .padding(.horizontal)
+
+                        DashboardCard {
+                            QuickActionsView()
+                        }
+                        .padding(.horizontal)
+                        
                         Section(header: Text("Recurring Expenses")) {
                             RecurringExpensesView(templates: recurringTemplates, expenses: expenses)
                         }
@@ -129,10 +120,17 @@ struct HomeView: View {
                             UnsettledPaysView()
                         }
                     }
+                    .listStyle(.plain)
+                    .refreshable {
+                        // In a real app, you might re-fetch data here.
+                        // For now, SwiftData's live queries handle this.
+                        // We can add a small delay to ensure the refresh indicator is visible.
+                        try? await Task.sleep(nanoseconds: 1_000_000_000)
+                    }
                 }
-                .padding(.horizontal)
-
-                FloatingAddButton(selectedTab: $selectedTab)
+                .background(Color(.systemGroupedBackground))
+                
+                FloatingAddButton(isPresented: $showingAddExpenseSheet)
             }
             .navigationTitle("Dashboard")
             .navigationBarHidden(true)
@@ -140,54 +138,61 @@ struct HomeView: View {
                 ensureSettingsExist()
                 updateSavingBuffer()
             }
+            .sheet(isPresented: $showingAddExpenseSheet) {
+                AddExpenseView()
+            }
         }
     }
     
     private func ensureSettingsExist() {
         if settings.isEmpty {
             let newSettings = UserSettings()
-            newSettings.lastBufferUpdate = Date() // Set initial date
+            newSettings.lastBufferUpdate = Date()
             modelContext.insert(newSettings)
         }
     }
 
     private func updateSavingBuffer() {
         guard let userSettings = settings.first else { return }
-        
         let calendar = Calendar.current
         let now = Date()
-        
-        // Ensure last update date exists, if not, set to now
         guard let lastUpdate = userSettings.lastBufferUpdate else {
             userSettings.lastBufferUpdate = now
             return
         }
         
-        // Check if the current month is different from the last update month
         if !calendar.isDate(now, equalTo: lastUpdate, toGranularity: .month) {
-            // Calculate the start of the previous month
             guard let previousMonthDate = calendar.date(byAdding: .month, value: -1, to: now) else { return }
-            
-            // Filter expenses for the previous month
             let previousMonthExpenses = expenses.filter {
                 calendar.isDate($0.date, equalTo: previousMonthDate, toGranularity: .month)
             }
-            
             let totalSpentLastMonth = previousMonthExpenses.reduce(0) { $0 + $1.amount }
             let surplus = userSettings.expenseLimit - totalSpentLastMonth
             
-            // If there was a surplus, add it to the buffer
             if surplus > 0 {
                 userSettings.savingBuffer += surplus
             }
-            
-            // Update the timestamp to the current date
             userSettings.lastBufferUpdate = now
         }
     }
 }
 
 // MARK: - Subviews
+
+struct DashboardCard<Content: View>: View {
+    let content: Content
+
+    init(@ViewBuilder content: () -> Content) {
+        self.content = content()
+    }
+
+    var body: some View {
+        content
+            .background(.regularMaterial)
+            .cornerRadius(16)
+            .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: 4)
+    }
+}
 
 struct HeaderView: View {
     private var monthYear: String {
@@ -202,6 +207,7 @@ struct HeaderView: View {
                 .font(.largeTitle)
                 .fontWeight(.bold)
                 .padding(.top)
+                .padding(.bottom, 2)
         }
     }
 }
@@ -211,38 +217,77 @@ struct RecurringExpensesView: View {
     let templates: [RecurringExpenseTemplate]
     let expenses: [Expense]
     @State private var addedTemplateID: PersistentIdentifier?
+    @State private var templateToEdit: RecurringExpenseTemplate?
 
     var body: some View {
-        if templates.isEmpty {
-            Text("No recurring expenses set up yet.")
-                .foregroundColor(.secondary)
-        } else {
-            ForEach(templates) { template in
-                HStack {
-                    Text(template.category?.iconName ?? "❓")
-                        .font(.title)
-                        .frame(width: 30)
-                    
-                    VStack(alignment: .leading) {
-                        Text(template.reason)
-                        Text(template.amount.toCurrency())
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                    Spacer()
-                    if addedTemplateID == template.id {
-                        Image(systemName: "checkmark.circle.fill")
+        Group {
+            if templates.isEmpty {
+                Text("No recurring expenses set up yet.")
+                    .foregroundColor(.secondary)
+            } else {
+                ForEach(templates) { template in
+                    HStack {
+                        Text(template.category?.iconName ?? "❓")
                             .font(.title)
-                            .foregroundColor(.green)
-                    } else {
-                        Button(action: {
-                            addExpense(from: template)
-                        }) {
-                            Image(systemName: "plus.circle.fill")
+                            .frame(width: 30)
+                        
+                        VStack(alignment: .leading) {
+                            Text(template.reason)
+                            Text(template.amount.toCurrency())
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        Spacer()
+                        if addedTemplateID == template.id {
+                            Image(systemName: "checkmark.circle.fill")
                                 .font(.title)
+                                .foregroundColor(.green)
+                                .transition(.scale.combined(with: .opacity))
+                        } else {
+                            Button(action: { addExpense(from: template) }) {
+                                Image(systemName: "plus.circle.fill")
+                                    .font(.title)
+                                    .foregroundColor(.blue)
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                        }
+                    }
+                    .swipeActions(edge: .leading, allowsFullSwipe: true) {
+                        // Removed addExpense from here
+                    }
+                    .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                        Button(role: .destructive) {
+                            delete(template: template)
+                        } label: {
+                            Label("Delete", systemImage: "trash")
+                        }
+
+                        Button {
+                            templateToEdit = template
+                        } label: {
+                            Label("Edit", systemImage: "pencil")
+                        }
+                        .tint(.blue)
+                    }
+                    .contextMenu {
+                        Button {
+                            templateToEdit = template
+                        } label: {
+                            Label("Edit", systemImage: "pencil")
+                        }
+                        
+                        Button(role: .destructive) {
+                            delete(template: template)
+                        } label: {
+                            Label("Delete", systemImage: "trash")
                         }
                     }
                 }
+            }
+        }
+        .sheet(item: $templateToEdit) { template in
+            NavigationView {
+                EditRecurringExpenseView(template: template)
             }
         }
     }
@@ -254,7 +299,7 @@ struct RecurringExpensesView: View {
             time: Date(),
             category: template.category,
             reason: template.reason,
-            isRecurring: false, // The new expense itself is not a recurring template
+            isRecurring: false,
             isShared: false,
             sharedParticipants: [],
             recurringTemplate: template
@@ -271,14 +316,26 @@ struct RecurringExpensesView: View {
             }
         }
     }
+    
+    private func delete(template: RecurringExpenseTemplate) {
+        modelContext.delete(template)
+    }
+}
+
+struct ScaleOnPressButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.9 : 1.0)
+            .animation(.easeInOut(duration: 0.2), value: configuration.isPressed)
+    }
 }
 
 struct FloatingAddButton: View {
-    @Binding var selectedTab: Int
+    @Binding var isPresented: Bool
 
     var body: some View {
         Button(action: {
-            selectedTab = 1 // Switch to the Add Expense tab
+            isPresented.toggle()
         }) {
             Image(systemName: "plus")
                 .font(.title.weight(.semibold))
@@ -288,9 +345,12 @@ struct FloatingAddButton: View {
                 .clipShape(Circle())
                 .shadow(radius: 4, x: 0, y: 4)
         }
+        .buttonStyle(ScaleOnPressButtonStyle())
         .padding()
+        .sensoryFeedback(.impact(weight: .medium), trigger: isPresented)
     }
 }
+
 
 // MARK: - Extensions
 
@@ -306,11 +366,9 @@ extension Double {
 // MARK: - Preview
 
 #Preview {
-    // A wrapper view is needed for the preview to work with the binding.
     struct PreviewWrapper: View {
-        @State private var selectedTab = 0
         var body: some View {
-            HomeView(selectedTab: $selectedTab)
+            HomeView()
                 .modelContainer(for: [Expense.self, UserSettings.self, Category.self, RecurringExpenseTemplate.self], inMemory: true)
         }
     }

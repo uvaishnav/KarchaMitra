@@ -18,35 +18,29 @@ struct ContentView: View {
         Group {
             if !isAppLockEnabled || isUnlocked {
                 TabView(selection: $selectedTab) {
-                    HomeView(selectedTab: $selectedTab)
+                    HomeView()
                         .tabItem {
                             Label("Home", systemImage: "house.fill")
                         }
                         .tag(0)
 
-                    AddExpenseView()
-                        .tabItem {
-                            Label("Add Expense", systemImage: "plus.circle.fill")
-                        }
-                        .tag(1)
-
                     AnalysisView()
                         .tabItem {
                             Label("Analysis", systemImage: "chart.pie.fill")
                         }
-                        .tag(2)
+                        .tag(1)
 
                     ProfileView()
                         .tabItem {
                             Label("Profile", systemImage: "person.crop.circle.fill")
                         }
-                        .tag(3)
+                        .tag(2)
 
                     HistoryView()
                         .tabItem {
                             Label("History", systemImage: "clock.fill")
                         }
-                        .tag(4)
+                        .tag(3)
                 }
             } else {
                 LockedView(onUnlock: authenticate)

@@ -20,6 +20,7 @@ struct KharchaMitraApp: App {
             UserSettings.self,
             Settlement.self,
             RecurringExpenseTemplate.self,
+            QuickAction.self,
         ])
         let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
 

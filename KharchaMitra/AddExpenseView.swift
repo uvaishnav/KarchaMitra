@@ -1,97 +1,177 @@
 import SwiftUI
 import SwiftData
+import ContactsUI
 
 struct AddExpenseView: View {
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.dismiss) private var dismiss
     @Query var categories: [Category]
 
+    // Form State
     @State private var amount: Double?
+    @State private var reason = ""
     @State private var date = Date()
     @State private var selectedCategory: Category?
-    @State private var reason = ""
     @State private var isRecurring = false
     @State private var isShared = false
-    @FocusState private var amountFieldIsFocused: Bool
+    @FocusState private var isKeyboardFocused: Bool
+
+    // View State
+    @State private var isSaving = false
+    @State private var showSuccessMessage = false
+    
+    // Inline Validation State
+    @State private var amountError: String?
+    @State private var reasonError: String?
 
     // Shared Expense State
     @State private var sharedParticipants: [SharedParticipant] = []
     @State private var showingAddParticipant = false
-    @State private var showingContactPicker = false
     @State private var showingAddCategorySheet = false
-
-    @State private var showSuccessMessage = false
+    
+    // Coordinator for UIKit Contact Picker
+    @State private var contactPickerCoordinator: ContactPickerCoordinator?
 
     private var isFormValid: Bool {
         amount != nil && amount ?? 0 > 0 && !reason.trimmingCharacters(in: .whitespaces).isEmpty
     }
-    
-    init() {}
+
+    init(amount: Double? = nil, reason: String = "", category: Category? = nil) {
+        _amount = State(initialValue: amount)
+        _reason = State(initialValue: reason)
+        _selectedCategory = State(initialValue: category)
+    }
 
     var body: some View {
         NavigationView {
             ZStack {
-                Form {
-                    Section(header: Text("Expense Details")) {
-                        TextField("Amount", value: $amount, format: .currency(code: "INR"))
-                            .keyboardType(.decimalPad)
-                            .focused($amountFieldIsFocused)
+                Color.gray.opacity(0.1).edgesIgnoringSafeArea(.all)
+                
+                ScrollView {
+                    VStack(spacing: 16) {
+                        VStack(spacing: 16) {
+                            TextField("Amount", value: $amount, format: .currency(code: "INR"))
+                                .keyboardType(.decimalPad)
+                                .padding()
+                                .background(Color.white)
+                                .cornerRadius(12)
+                                .focused($isKeyboardFocused)
+                                .onChange(of: amount) { _, _ in validateAmount() }
 
-                        TextField("Reason for expense", text: $reason)
-
-                        Picker("Category", selection: $selectedCategory) {
-                            Text("None").tag(nil as Category?)
-                            ForEach(categories.sorted(by: { $0.name < $1.name })) {
-                                category in
-                                Text(category.name).tag(category as Category?)
+                            if let amountError {
+                                Text(amountError).font(.caption).foregroundColor(.red)
                             }
-                        }
-                        
-                        Button("Create New Category") {
-                            showingAddCategorySheet.toggle()
-                        }
-                        
-                        DatePicker("Date", selection: $date, displayedComponents: .date)
-                        DatePicker("Time", selection: $date, displayedComponents: .hourAndMinute)
-                    }
 
-                    Section(header: Text("Additional Options")) {
-                        Toggle("Recurring Payment", isOn: $isRecurring)
-                        Toggle("Shared Expense", isOn: $isShared.animation())
-                    }
-
-                    if isShared {
-                        Section(header: Text("Shared With")) {
-                            ForEach($sharedParticipants) { $participant in
-                                HStack {
-                                    Text(participant.name)
-                                    Spacer()
-                                    TextField("Amount", value: $participant.amountOwed, format: .currency(code: "INR"))
-                                        .keyboardType(.decimalPad)
-                                        .multilineTextAlignment(.trailing)
-                                }
-                            }
-                            .onDelete(perform: { indexSet in
-                                sharedParticipants.remove(atOffsets: indexSet)
-                            })
-
-                            HStack {
-                                Button("Add from Contacts") { showingContactPicker.toggle() }
-                                    .buttonStyle(.borderless)
-                                Spacer()
-                                Button("Add Manually") { showingAddParticipant.toggle() }
-                                    .buttonStyle(.borderless)
+                            TextField("Reason for expense", text: $reason)
+                                .padding()
+                                .background(Color.white)
+                                .cornerRadius(12)
+                                .focused($isKeyboardFocused)
+                                .onChange(of: reason) { _, _ in validateReason() }
+                            
+                            if let reasonError {
+                                Text(reasonError).font(.caption).foregroundColor(.red)
                             }
                             
-                            if !sharedParticipants.isEmpty {
-                                Button("Split Equally", action: splitEqually)
+                            HStack {
+                                Picker("Category", selection: $selectedCategory) {
+                                    Text("Select Category").tag(nil as Category?)
+                                    ForEach(categories.sorted(by: { $0.name < $1.name })) { category in
+                                        Text(category.name).tag(category as Category?)
+                                    }
+                                }
+                                .pickerStyle(.menu)
+                                Spacer()
+                                Button("New") { showingAddCategorySheet.toggle() }
+                                    .buttonStyle(.bordered)
                             }
+                            .padding(.horizontal)
+                            .padding(.vertical, 8)
+                            .background(Color.white)
+                            .cornerRadius(12)
+                            
+                            DatePicker("Date", selection: $date, displayedComponents: .date)
+                                .padding()
+                                .background(Color.white)
+                                .cornerRadius(12)
+                        }
+                        .padding(.horizontal, 24)
+                        
+                        VStack(spacing: 12) {
+                            Toggle(isOn: $isRecurring) {
+                                HStack {
+                                    Image(systemName: "arrow.2.squarepath")
+                                    Text("Make this a recurring payment")
+                                }
+                            }
+                            .padding()
+                            .background(Color.white)
+                            .cornerRadius(12)
+                            .tint(.accentColor)
+                            
+                            Toggle(isOn: $isShared.animation()) {
+                                HStack {
+                                    Image(systemName: "person.2.fill")
+                                    Text("Share this expense")
+                                }
+                            }
+                            .padding()
+                            .background(Color.white)
+                            .cornerRadius(12)
+                            .tint(.accentColor)
+                        }
+                        .padding(.horizontal, 24)
+                        
+                        if isShared {
+                            VStack(spacing: 12) {
+                                ForEach($sharedParticipants) { $participant in
+                                    HStack {
+                                        Text(participant.name)
+                                        Spacer()
+                                        TextField("Amount", value: $participant.amountOwed, format: .currency(code: "INR"))
+                                            .keyboardType(.decimalPad)
+                                            .multilineTextAlignment(.trailing)
+                                            .frame(width: 100)
+                                    }
+                                    .padding()
+                                    .background(Color.white)
+                                    .cornerRadius(12)
+                                }
+                                .onDelete(perform: { indexSet in
+                                    sharedParticipants.remove(atOffsets: indexSet)
+                                })
+                                
+                                HStack(spacing: 12) {
+                                    Button { self.presentContactPicker() } label: {
+                                        Label("From Contacts", systemImage: "person.crop.circle.badge.plus")
+                                            .frame(maxWidth: .infinity)
+                                    }
+                                    .buttonStyle(.bordered)
+                                    
+                                    Button { showingAddParticipant.toggle() } label: {
+                                        Label("Manually", systemImage: "plus.circle")
+                                            .frame(maxWidth: .infinity)
+                                    }
+                                    .buttonStyle(.bordered)
+                                }
+                                
+                                if !sharedParticipants.isEmpty {
+                                    Button("Split Equally", action: splitEqually)
+                                        .frame(maxWidth: .infinity)
+                                        .buttonStyle(.borderedProminent)
+                                }
+                            }
+                            .padding(.horizontal, 24)
+                            .transition(.asymmetric(insertion: .scale, removal: .opacity))
                         }
                     }
+                    .padding(.vertical)
                 }
                 .navigationTitle("Add Expense")
+                .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .navigationBarLeading) {
-                        Button("Clear", action: resetForm)
+                        Button("Cancel") { dismiss() }
                     }
                     ToolbarItem(placement: .navigationBarTrailing) {
                         Button("Save", action: saveExpense)
@@ -99,31 +179,18 @@ struct AddExpenseView: View {
                     }
                     ToolbarItemGroup(placement: .keyboard) {
                         Spacer()
-                        Button("Done") {
-                            UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
-                        }
+                        Button("Done") { isKeyboardFocused = false }
                     }
                 }
-                .sheet(isPresented: $showingAddParticipant) {
-                    AddParticipantView(onAdd: { participant in
-                        sharedParticipants.append(participant)
-                    })
-                }
-                .sheet(isPresented: $showingContactPicker) {
-                    ContactPicker { contactName in
-                        let newParticipant = SharedParticipant(name: contactName, amountOwed: 0)
-                        sharedParticipants.append(newParticipant)
-                    }
-                }
-                .sheet(isPresented: $showingAddCategorySheet) {
-                    AddCategoryView(onCategoryAdded: { newCategory in
-                        self.selectedCategory = newCategory
-                    })
-                }
+                .sheet(isPresented: $showingAddParticipant) { AddParticipantView(onAdd: { p in sharedParticipants.append(p) }) }
+                .sheet(isPresented: $showingAddCategorySheet) { AddCategoryView(onCategoryAdded: { c in self.selectedCategory = c }) }
                 
-                // Overlays for user feedback
-                if showSuccessMessage {
+                if isSaving || showSuccessMessage {
                     Color.black.opacity(0.4).edgesIgnoringSafeArea(.all)
+                }
+
+                if isSaving {
+                    ProgressView().scaleEffect(2).progressViewStyle(CircularProgressViewStyle(tint: .white))
                 }
 
                 if showSuccessMessage {
@@ -131,11 +198,11 @@ struct AddExpenseView: View {
                         Image(systemName: "checkmark.circle.fill")
                             .font(.largeTitle)
                             .foregroundColor(.green)
-                        Text("Expense Saved!")
-                            .padding(.top, 5)
+                            .symbolEffect(.bounce, value: showSuccessMessage)
+                        Text("Expense Saved!").padding(.top, 5)
                     }
                     .padding()
-                    .background(Color(.systemBackground))
+                    .background(.regularMaterial)
                     .cornerRadius(10)
                     .shadow(radius: 10)
                     .transition(.opacity.combined(with: .scale))
@@ -144,9 +211,56 @@ struct AddExpenseView: View {
         }
     }
 
+    private func presentContactPicker() {
+        let coordinator = ContactPickerCoordinator(
+            onSelect: { name in
+                self.sharedParticipants.append(.init(name: name, amountOwed: 0))
+                self.contactPickerCoordinator = nil
+            },
+            onCancel: {
+                self.contactPickerCoordinator = nil
+            }
+        )
+        self.contactPickerCoordinator = coordinator
+
+        let contactPicker = CNContactPickerViewController()
+        contactPicker.delegate = coordinator
+        contactPicker.displayedPropertyKeys = [CNContactGivenNameKey, CNContactFamilyNameKey]
+
+        var topViewController = UIApplication.shared.connectedScenes
+                .compactMap({ $0 as? UIWindowScene }).first?.windows.first?.rootViewController
+        
+        while let presentedViewController = topViewController?.presentedViewController {
+            topViewController = presentedViewController
+        }
+
+        guard let topVC = topViewController else {
+            self.contactPickerCoordinator = nil
+            return
+        }
+
+        topVC.present(contactPicker, animated: true)
+    }
+
+    private func validateAmount() {
+        if amount == nil || amount ?? 0 <= 0 {
+            amountError = "Amount must be greater than zero."
+        } else {
+            amountError = nil
+        }
+    }
+    
+    private func validateReason() {
+        if reason.trimmingCharacters(in: .whitespaces).isEmpty {
+            reasonError = "Reason cannot be empty."
+        } else {
+            reasonError = nil
+        }
+    }
+
     private func splitEqually() {
         guard let totalAmount = amount, !sharedParticipants.isEmpty else { return }
-        let splitCount = sharedParticipants.count + 1 // Including the user
+        let splitCount = sharedParticipants.count + 1
         let splitAmount = totalAmount / Double(splitCount)
         
         for i in sharedParticipants.indices {
@@ -155,48 +269,59 @@ struct AddExpenseView: View {
     }
 
     private func saveExpense() {
-        guard let amount = amount else { return }
+        validateAmount()
+        validateReason()
+        guard isFormValid else { return }
+        
+        withAnimation { isSaving = true }
 
-        let newExpense = Expense(
-            amount: amount,
-            date: date,
-            time: date, // Using the same date picker for time
-            category: selectedCategory,
-            reason: reason,
-            isRecurring: isRecurring,
-            isShared: isShared,
-            sharedParticipants: sharedParticipants
-        )
-        modelContext.insert(newExpense)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            guard let amount = amount else {
+                isSaving = false
+                return
+            }
 
-        if isRecurring {
-            let newTemplate = RecurringExpenseTemplate(
-                amount: amount,
-                category: selectedCategory,
-                reason: reason
-            )
-            modelContext.insert(newTemplate)
-        }
+            let newExpense = Expense(amount: amount, date: date, time: date, category: selectedCategory, reason: reason, isRecurring: isRecurring, isShared: isShared, sharedParticipants: sharedParticipants)
+            modelContext.insert(newExpense)
 
-        withAnimation {
-            showSuccessMessage = true
-        }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+            if isRecurring {
+                let newTemplate = RecurringExpenseTemplate(amount: amount, category: selectedCategory, reason: reason)
+                modelContext.insert(newTemplate)
+            }
+
             withAnimation {
-                showSuccessMessage = false
-                resetForm()
+                isSaving = false
+                showSuccessMessage = true
+            }
+            
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                dismiss()
             }
         }
     }
+}
 
-    private func resetForm() {
-        amount = nil
-        selectedCategory = nil
-        reason = ""
-        isRecurring = false
-        isShared = false
-        date = Date()
-        sharedParticipants = []
+fileprivate class ContactPickerCoordinator: NSObject, CNContactPickerDelegate {
+    var onSelect: (String) -> Void
+    var onCancel: () -> Void
+
+    init(onSelect: @escaping (String) -> Void, onCancel: @escaping () -> Void) {
+        self.onSelect = onSelect
+        self.onCancel = onCancel
+        super.init()
+    }
+
+    func contactPicker(_ picker: CNContactPickerViewController, didSelect contact: CNContact) {
+        let fullName = CNContactFormatter.string(from: contact, style: .fullName) ?? "Unknown Contact"
+        picker.dismiss(animated: true) {
+            self.onSelect(fullName)
+        }
+    }
+
+    func contactPickerDidCancel(_ picker: CNContactPickerViewController) {
+        picker.dismiss(animated: true) {
+            self.onCancel()
+        }
     }
 }
 

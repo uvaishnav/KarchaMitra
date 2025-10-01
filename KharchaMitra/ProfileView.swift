@@ -3,8 +3,10 @@ import SwiftData
 
 struct ProfileView: View {
     @Query var settings: [UserSettings]
+    @Query var categories: [Category]
+    @Query var templates: [RecurringExpenseTemplate]
+    
     private var userSettings: UserSettings? {
-        // There should only be one settings object
         settings.first
     }
     
@@ -12,36 +14,85 @@ struct ProfileView: View {
 
     var body: some View {
         NavigationView {
-            Form { // Using Form for better styling of sections
-                Section(header: Text("Financial Settings")) {
-                    HStack {
-                        Text("Monthly Limit")
-                        TextField("Amount", value: $editableLimit, format: .currency(code: "INR"))
-                            .keyboardType(.decimalPad)
-                            .multilineTextAlignment(.trailing)
+            ScrollView {
+                VStack(spacing: 24) {
+                    // Profile Header
+                    VStack {
+                        Image(systemName: "person.circle.fill")
+                            .font(.system(size: 80))
+                            .foregroundColor(.blue)
+                        Text("User Name") // Placeholder
+                            .font(.title.weight(.bold))
                     }
-                }
+                    .padding(.vertical)
 
-                Section(header: Text("App Management")) {
-                    NavigationLink(destination: CategoriesView()) {
-                        Label("Categories", systemImage: "list.bullet")
+                    // Financial Settings Card
+                    DashboardCard {
+                        VStack {
+                            Text("Financial Settings")
+                                .font(.headline).fontWeight(.medium)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding()
+                            
+                            Divider()
+                            
+                            HStack {
+                                Text("Monthly Limit")
+                                    .padding(.leading)
+                                Spacer()
+                                TextField("Amount", value: $editableLimit, format: .currency(code: "INR"))
+                                    .keyboardType(.decimalPad)
+                                    .multilineTextAlignment(.trailing)
+                                    .padding(.trailing)
+                            }
+                            .padding(.vertical, 8)
+                        }
                     }
-                    
-                    NavigationLink(destination: RecurringPaymentsListView()) {
-                        Label("Recurring Payments", systemImage: "arrow.2.circlepath")
+                    .padding(.horizontal)
+
+                    // App Management Card
+                    DashboardCard {
+                        VStack(alignment: .leading) {
+                            Text("App Management")
+                                .font(.headline).fontWeight(.medium)
+                                .padding([.leading, .top, .bottom])
+                            
+                            Divider()
+                            
+                            NavigationLink(destination: CategoriesView()) {
+                                rowView(title: "Categories", icon: "list.bullet", count: categories.count)
+                            }
+                            
+                            Divider().padding(.leading)
+                            
+                            NavigationLink(destination: RecurringPaymentsListView()) {
+                                rowView(title: "Recurring Payments", icon: "arrow.2.circlepath", count: templates.count)
+                            }
+                            
+                            Divider().padding(.leading)
+
+                            NavigationLink(destination: CustomizeQuickActionsView()) {
+                                rowView(title: "Quick Actions", icon: "bolt.fill", count: nil)
+                            }
+                            
+                            Divider().padding(.leading)
+
+                            NavigationLink(destination: SettingsView()) {
+                                rowView(title: "Settings", icon: "gearshape.fill", count: nil)
+                            }
+                        }
                     }
-                    
-                    NavigationLink(destination: SettingsView()) {
-                        Label("Settings", systemImage: "gearshape.fill")
-                    }
+                    .padding(.horizontal)
                 }
+                .padding(.vertical)
             }
+            .background(Color(.systemGroupedBackground))
             .navigationTitle("Profile")
+            .navigationBarHidden(true)
             .toolbar {
                 ToolbarItemGroup(placement: .keyboard) {
                     Spacer()
                     Button("Done") {
-                        // Universal dismiss keyboard action
                         UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
                     }
                 }
@@ -58,8 +109,26 @@ struct ProfileView: View {
             }
         }
     }
+    
+    @ViewBuilder
+    private func rowView(title: String, icon: String, count: Int?) -> some View {
+        HStack {
+            Label(title, systemImage: icon)
+                .foregroundColor(.primary)
+            Spacer()
+            if let count {
+                Text("\(count)")
+                    .foregroundColor(.secondary)
+            }
+            Image(systemName: "chevron.right")
+                .font(.caption.weight(.bold))
+                .foregroundColor(.secondary)
+        }
+        .padding()
+    }
 }
 
 #Preview {
     ProfileView()
+        .modelContainer(for: [UserSettings.self, Category.self, RecurringExpenseTemplate.self], inMemory: true)
 }
