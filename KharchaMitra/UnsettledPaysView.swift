@@ -5,6 +5,7 @@ struct UnsettledPaysView: View {
     @Query var expenses: [Expense]
     
     @State private var activeSheet: SheetContent?
+    @State private var animateCards = false
     
     // This struct helps in aggregating dues per person.
     struct AggregatedDebt: Identifiable, Hashable {
@@ -45,30 +46,43 @@ struct UnsettledPaysView: View {
     var body: some View {
         Group {
             if aggregatedDebts.isEmpty {
-                Text("No unsettled expenses yet.")
-                    .foregroundColor(.secondary)
+                // Modern Empty State
+                VStack(spacing: AppSpacing.md) {
+                    ZStack {
+                        Circle()
+                            .fill(Color.primaryGradient)
+                            .frame(width: 80, height: 80)
+                            .opacity(0.2)
+                        
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.system(size: 40))
+                            .foregroundStyle(Color.primaryGradient)
+                    }
+                    
+                    Text("All Settled Up! 🎉")
+                        .font(.headline)
+                        .foregroundColor(.textPrimary)
+                    
+                    Text("You have no pending shared expenses")
+                        .font(.subheadline)
+                        .foregroundColor(.textSecondary)
+                        .multilineTextAlignment(.center)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, AppSpacing.xl)
             } else {
-                ForEach(aggregatedDebts) { debt in
+                ForEach(Array(aggregatedDebts.enumerated()), id: \.element.id) { index, debt in
                     NavigationLink(destination: DebtDetailView(participantName: debt.name)) {
-                        HStack {
-                            Image(systemName: "person.circle.fill")
-                                .font(.headline)
-                                .foregroundColor(.secondary)
-                            Text(debt.name)
-                            Spacer()
-                            Text(debt.amountOwed.toCurrency())
-                                .fontWeight(.semibold)
-                                .foregroundColor(.orange)
-                        }
+                        UnsettledDebtCard(debt: debt)
                     }
                     .buttonStyle(PlainButtonStyle())
                     .swipeActions(edge: .leading, allowsFullSwipe: true) {
                         Button {
                             activeSheet = .settle(debt)
                         } label: {
-                            Label("Settle", systemImage: "indianrupeesign.circle.fill")
+                            Label("Settle", systemImage: "checkmark.circle.fill")
                         }
-                        .tint(.green)
+                        .tint(.successGreen)
                     }
                     .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                         Button {
@@ -76,9 +90,23 @@ struct UnsettledPaysView: View {
                         } label: {
                             Label("Remind", systemImage: "bell.fill")
                         }
-                        .tint(.blue)
+                        .tint(.infoBlue)
                     }
+                    .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
+                    .listRowSeparator(.hidden)
+                    .scaleEffect(animateCards ? 1.0 : 0.9)
+                    .opacity(animateCards ? 1.0 : 0.0)
+                    .animation(
+                        .spring(response: 0.5, dampingFraction: 0.7)
+                            .delay(Double(index) * 0.1),
+                        value: animateCards
+                    )
                 }
+            }
+        }
+        .onAppear {
+            withAnimation {
+                animateCards = true
             }
         }
         .sheet(item: $activeSheet) { sheetContent in
@@ -90,6 +118,73 @@ struct UnsettledPaysView: View {
                 ShareSheet(activityItems: [reminderText])
             }
         }
+    }
+}
+
+// MARK: - Unsettled Debt Card Component
+struct UnsettledDebtCard: View {
+    let debt: UnsettledPaysView.AggregatedDebt
+    
+    var body: some View {
+        HStack(spacing: AppSpacing.md) {
+            // Profile icon with gradient
+            ZStack {
+                Circle()
+                    .fill(Color.primaryGradient)
+                    .frame(width: 50, height: 50)
+                    .glowShadow(color: Color.brandMagenta)
+                
+                Image(systemName: "person.fill")
+                    .font(.title3)
+                    .foregroundColor(.white)
+            }
+            
+            // Debt details
+            VStack(alignment: .leading, spacing: 4) {
+                Text(debt.name)
+                    .font(.headline)
+                    .foregroundColor(.textPrimary)
+                
+                HStack(spacing: 4) {
+                    Image(systemName: "clock.fill")
+                        .font(.caption2)
+                    Text("Pending settlement")
+                        .font(.caption)
+                }
+                .foregroundColor(.textSecondary)
+            }
+            
+            Spacer()
+            
+            // Amount with arrow
+            HStack(spacing: AppSpacing.xs) {
+                VStack(alignment: .trailing, spacing: 2) {
+                    Text(debt.amountOwed.toCurrency())
+                        .font(.system(.title3, design: .rounded))
+                        .fontWeight(.bold)
+                        .foregroundColor(.warningOrange)
+                        .monospacedDigit()
+                    
+                    Text("You'll get")
+                        .font(.caption2)
+                        .foregroundColor(.textSecondary)
+                }
+                
+                Image(systemName: "chevron.right")
+                    .font(.caption)
+                    .foregroundColor(.textTertiary)
+            }
+        }
+        .padding(AppSpacing.md)
+        .background(
+            RoundedRectangle(cornerRadius: AppCornerRadius.large)
+                .fill(Color.cardBackground)
+                .softShadow()
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: AppCornerRadius.large)
+                .stroke(Color.divider.opacity(0.3), lineWidth: 1)
+        )
     }
 }
 

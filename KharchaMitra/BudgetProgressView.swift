@@ -6,8 +6,10 @@ struct BudgetProgressView: View {
     let safeLimit: Double
     let limitLeft: Double
 
-    // Pulse animation state
+    // Animation states
     @State private var isPulsing = false
+    @State private var animateProgress = false
+    @State private var showDetails = false
 
     private var progress: Double {
         if limit > 0 {
@@ -34,110 +36,213 @@ struct BudgetProgressView: View {
     
     private var velocityColor: Color {
         if dailySpendingRate <= targetDailyRate {
-            return .green
+            return .successGreen
         } else if dailySpendingRate <= targetDailyRate * 1.25 {
-            return .orange
+            return .warningOrange
         } else {
-            return .red
+            return .errorRed
         }
     }
 
     private var progressGradient: LinearGradient {
-        if progress < 0.5 {
-            return LinearGradient(gradient: Gradient(colors: [.green, .cyan]), startPoint: .top, endPoint: .bottom)
-        } else if progress < 0.9 {
-            return LinearGradient(gradient: Gradient(colors: [.orange, .yellow]), startPoint: .top, endPoint: .bottom)
-        } else {
-            return LinearGradient(gradient: Gradient(colors: [.red, .orange]), startPoint: .top, endPoint: .bottom)
-        }
+        return LinearGradient.budgetProgress(percentage: progress)
     }
     
     private var progressColor: Color {
         if progress < 0.5 {
-            return .green
+            return .successGreen
+        } else if progress < 0.75 {
+            return Color(hex: "14B8A6") // Teal
         } else if progress < 0.9 {
-            return .orange
+            return .warningOrange
         } else {
-            return .red
+            return .errorRed
         }
+    }
+    
+    private var percentageText: String {
+        return String(format: "%.0f%%", min(progress * 100, 100))
     }
 
     var body: some View {
-        VStack {
+        VStack(spacing: AppSpacing.md) {
+            // Circular Progress with Modern Styling
             ZStack {
+                // Background circle with subtle gradient
                 Circle()
-                    .stroke(lineWidth: 20.0)
-                    .opacity(0.1)
-                    .foregroundColor(.gray)
-
-                Circle()
-                    .trim(from: 0.0, to: CGFloat(min(self.progress, 1.0)))
-                    .stroke(style: StrokeStyle(lineWidth: 20.0, lineCap: .round, lineJoin: .round))
-                    .fill(progressGradient)
-                    .rotationEffect(Angle(degrees: 270.0))
-                    .shadow(color: progressColor.opacity(0.5), radius: 10, x: 0, y: 5)
+                    .stroke(
+                        LinearGradient(
+                            colors: [Color.gray.opacity(0.08), Color.gray.opacity(0.12)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: 22
+                    )
                 
-                // Pulse effect
+                // Animated progress circle
                 Circle()
-                    .stroke(progressColor.opacity(0.5), lineWidth: 2)
-                    .frame(width: 250, height: 250)
-                    .scaleEffect(isPulsing ? 1.15 : 1.0)
-                    .opacity(isPulsing ? 0 : 1)
-
-                VStack {
-                    Text("Safe Limit")
-                        .font(.caption)
-                        .fontWeight(.medium)
-                        .foregroundColor(.secondary)
-                    Text(safeLimit.toCurrency())
-                        .font(.system(size: 32, weight: .bold, design: .rounded))
-                        .foregroundColor(.blue)
+                    .trim(from: 0.0, to: animateProgress ? CGFloat(min(progress, 1.0)) : 0.0)
+                    .stroke(
+                        progressGradient,
+                        style: StrokeStyle(
+                            lineWidth: 22,
+                            lineCap: .round,
+                            lineJoin: .round
+                        )
+                    )
+                    .rotationEffect(Angle(degrees: 270.0))
+                    .animation(.spring(response: 1.2, dampingFraction: 0.8), value: animateProgress)
+                    .glowShadow(color: progressColor)
+                
+                // Pulse effect for over-budget warning
+                if progress > 0.9 {
+                    Circle()
+                        .stroke(progressColor.opacity(0.3), lineWidth: 3)
+                        .scaleEffect(isPulsing ? 1.12 : 1.0)
+                        .opacity(isPulsing ? 0 : 0.8)
+                        .animation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true), value: isPulsing)
+                }
+                
+                // Center content with improved hierarchy
+                VStack(spacing: AppSpacing.xs) {
+                    // Percentage indicator
+                    Text(percentageText)
+                        .font(.system(size: 42, weight: .bold, design: .rounded))
+                        .foregroundStyle(progressColor)
+                        .scaleEffect(showDetails ? 1.0 : 0.8)
+                        .opacity(showDetails ? 1.0 : 0.0)
                     
-                    Text("Limit Left")
-                        .font(.caption)
-                        .fontWeight(.medium)
-                        .foregroundColor(.secondary)
-                        .padding(.top, 8)
-                    Text(limitLeft.toCurrency())
-                        .font(.system(size: 28, weight: .semibold, design: .rounded))
-                        .foregroundColor(.green)
+                    // Safe Limit
+                    VStack(spacing: 2) {
+                        Text("Safe Limit")
+                            .font(.caption)
+                            .fontWeight(.semibold)
+                            .foregroundColor(.textSecondary)
+                            .textCase(.uppercase)
+                            .tracking(0.5)
+                        
+                        Text(safeLimit.toCurrency())
+                            .font(.system(size: 28, weight: .bold, design: .rounded))
+                            .foregroundStyle(Color.brandCyan)
+                            .monospacedDigit()
+                    }
+                    .scaleEffect(showDetails ? 1.0 : 0.8)
+                    .opacity(showDetails ? 1.0 : 0.0)
+                    
+                    Divider()
+                        .frame(width: 60)
+                        .padding(.vertical, AppSpacing.xs)
+                        .opacity(showDetails ? 0.3 : 0.0)
+                    
+                    // Limit Left
+                    VStack(spacing: 2) {
+                        Text("Remaining")
+                            .font(.caption)
+                            .fontWeight(.semibold)
+                            .foregroundColor(.textSecondary)
+                            .textCase(.uppercase)
+                            .tracking(0.5)
+                        
+                        Text(limitLeft.toCurrency())
+                            .font(.system(size: 24, weight: .bold, design: .rounded))
+                            .foregroundStyle(limitLeft >= 0 ? Color.successGreen : Color.errorRed)
+                            .monospacedDigit()
+                    }
+                    .scaleEffect(showDetails ? 1.0 : 0.8)
+                    .opacity(showDetails ? 1.0 : 0.0)
                 }
             }
-            .frame(width: 250, height: 250)
+            .frame(width: 260, height: 260)
+            .padding(AppSpacing.lg)
             
-            HStack {
-                VStack(alignment: .leading) {
-                    Text("Spending Velocity")
-                        .font(.caption.weight(.bold)).foregroundColor(.secondary)
-                    Text("Your current daily average.")
-                        .font(.caption2).foregroundColor(.secondary)
+            // Spending Velocity Card (Modern Design)
+            HStack(spacing: AppSpacing.md) {
+                // Icon with gradient background
+                ZStack {
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(velocityColor.opacity(0.15))
+                        .frame(width: 48, height: 48)
+                    
+                    Image(systemName: dailySpendingRate <= targetDailyRate ? "arrow.down.right.circle.fill" : "arrow.up.right.circle.fill")
+                        .font(.system(size: 24))
+                        .foregroundStyle(velocityColor)
+                        .symbolEffect(.bounce, value: dailySpendingRate)
                 }
+                
+                // Text content
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Spending Velocity")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.textPrimary)
+                    
+                    Text("Your current daily average")
+                        .font(.caption)
+                        .foregroundColor(.textSecondary)
+                }
+                
                 Spacer()
-                Text(dailySpendingRate.toCurrency())
-                    .font(.system(.headline, design: .rounded).weight(.bold))
-                    .foregroundColor(velocityColor)
-                Image(systemName: dailySpendingRate <= targetDailyRate ? "arrow.down.right" : "arrow.up.right")
-                    .foregroundColor(velocityColor)
+                
+                // Amount with indicator
+                VStack(alignment: .trailing, spacing: 2) {
+                    Text(dailySpendingRate.toCurrency())
+                        .font(.system(.title3, design: .rounded))
+                        .fontWeight(.bold)
+                        .foregroundStyle(velocityColor)
+                        .monospacedDigit()
+                    
+                    HStack(spacing: 2) {
+                        Image(systemName: dailySpendingRate <= targetDailyRate ? "checkmark.circle.fill" : "exclamationmark.circle.fill")
+                            .font(.caption2)
+                        Text(dailySpendingRate <= targetDailyRate ? "On Track" : "High")
+                            .font(.caption2)
+                            .fontWeight(.medium)
+                    }
+                    .foregroundStyle(velocityColor)
+                }
             }
-            .padding(.top)
-
+            .padding(AppSpacing.md)
+            .background(
+                RoundedRectangle(cornerRadius: AppCornerRadius.large)
+                    .fill(Color.cardBackground)
+                    .softShadow()
+            )
         }
-        .padding()
+        .padding(AppSpacing.md)
         .background(
-            LinearGradient(gradient: Gradient(colors: [Color.blue.opacity(0.2), Color.purple.opacity(0.2)]), startPoint: .topLeading, endPoint: .bottomTrailing)
+            RoundedRectangle(cornerRadius: AppCornerRadius.xLarge)
+                .fill(.ultraThinMaterial)
+                .overlay(
+                    RoundedRectangle(cornerRadius: AppCornerRadius.xLarge)
+                        .fill(Color.subtleGradient)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: AppCornerRadius.xLarge)
+                        .stroke(Color.white.opacity(0.2), lineWidth: 1)
+                )
+                .cardShadow()
         )
-        .background(.ultraThinMaterial.opacity(0.8))
-        .cornerRadius(20)
-        .padding(.horizontal)
+        .padding(.horizontal, AppSpacing.md)
+        .onAppear {
+            withAnimation(.spring(response: 0.6, dampingFraction: 0.7).delay(0.2)) {
+                animateProgress = true
+            }
+            withAnimation(.easeOut(duration: 0.6).delay(0.4)) {
+                showDetails = true
+            }
+            if progress > 0.9 {
+                isPulsing = true
+            }
+        }
         .onChange(of: progress) { oldValue, newValue in
             if newValue > 0.9 && !isPulsing {
-                withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
+                withAnimation {
                     isPulsing = true
                 }
             } else if newValue <= 0.9 && isPulsing {
                 isPulsing = false
             }
         }
-        .animation(.easeInOut(duration: 0.8), value: progress)
     }
 }
+

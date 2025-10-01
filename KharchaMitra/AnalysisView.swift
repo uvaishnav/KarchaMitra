@@ -8,32 +8,88 @@ struct AnalysisView: View {
 
     var body: some View {
         NavigationView {
-            TabView {
-                AnalysisOverviewView()
-                    .tabItem {
-                        Label("Overview", systemImage: "chart.pie")
-                    }
+            ZStack {
+                // Modern Tab View with Custom Styling
+                TabView {
+                    AnalysisOverviewView()
+                        .tabItem {
+                            Label("Overview", systemImage: "chart.pie.fill")
+                        }
 
-                AnalysisTrendsView()
-                    .tabItem {
-                        Label("Trends", systemImage: "chart.xyaxis.line")
-                    }
+                    AnalysisTrendsView()
+                        .tabItem {
+                            Label("Trends", systemImage: "chart.xyaxis.line")
+                        }
 
-                AnalysisCategoriesView()
-                    .tabItem {
-                        Label("Categories", systemImage: "list.bullet")
-                    }
+                    AnalysisCategoriesView()
+                        .tabItem {
+                            Label("Categories", systemImage: "square.grid.2x2.fill")
+                        }
 
-                AnalysisSharedView()
-                    .tabItem {
-                        Label("Shared", systemImage: "person.2")
+                    AnalysisSharedView()
+                        .tabItem {
+                            Label("Shared", systemImage: "person.2.fill")
+                        }
+                }
+                .tint(Color.brandMagenta)
+                
+                // Modern PDF Generation Overlay
+                if isGeneratingPDF {
+                    Color.black.opacity(0.5)
+                        .ignoresSafeArea()
+                        .transition(.opacity)
+                    
+                    VStack(spacing: AppSpacing.lg) {
+                        // Animated Progress Indicator
+                        ZStack {
+                            Circle()
+                                .stroke(Color.brandMagenta.opacity(0.2), lineWidth: 4)
+                                .frame(width: 80, height: 80)
+                            
+                            Circle()
+                                .trim(from: 0, to: 0.7)
+                                .stroke(
+                                    Color.primaryGradient,
+                                    style: StrokeStyle(lineWidth: 4, lineCap: .round)
+                                )
+                                .frame(width: 80, height: 80)
+                                .rotationEffect(.degrees(-90))
+                                .animation(.linear(duration: 1.0).repeatForever(autoreverses: false), value: isGeneratingPDF)
+                        }
+                        
+                        VStack(spacing: AppSpacing.xs) {
+                            Text("Generating PDF")
+                                .font(.headline)
+                                .foregroundColor(.white)
+                            
+                            Text("Compiling your financial analysis")
+                                .font(.caption)
+                                .foregroundColor(.white.opacity(0.8))
+                        }
                     }
+                    .padding(AppSpacing.xl)
+                    .background(
+                        RoundedRectangle(cornerRadius: AppCornerRadius.xLarge)
+                            .fill(.ultraThinMaterial)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: AppCornerRadius.xLarge)
+                                    .stroke(Color.white.opacity(0.2), lineWidth: 1)
+                            )
+                            .elevatedShadow()
+                    )
+                    .transition(.scale.combined(with: .opacity))
+                }
             }
-            .navigationTitle("Analysis")
+            .navigationTitle("Financial Analysis")
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Export PDF", systemImage: "square.and.arrow.up") {
-                        exportToPDF()
+                    Button(action: exportToPDF) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "doc.richtext.fill")
+                            Text("PDF")
+                                .font(.subheadline.weight(.semibold))
+                        }
+                        .foregroundStyle(Color.primaryGradient)
                     }
                     .disabled(isGeneratingPDF)
                 }
@@ -43,30 +99,26 @@ struct AnalysisView: View {
                     ShareSheet(activityItems: [pdfURL])
                 }
             }
-        }
-        .overlay {
-            if isGeneratingPDF {
-                Color.black.opacity(0.4).ignoresSafeArea()
-                VStack(spacing: 20) {
-                    ProgressView()
-                        .scaleEffect(1.5)
-                    Text("Generating PDF...")
-                        .font(.headline)
-                }
-                .padding(30)
-                .background(.regularMaterial)
-                .cornerRadius(15)
-                .shadow(radius: 10)
-            }
+            .animation(.spring(response: 0.4, dampingFraction: 0.8), value: isGeneratingPDF)
         }
     }
     
     private func exportToPDF() {
         Task {
-            await MainActor.run { isGeneratingPDF = true }
+            await MainActor.run {
+                withAnimation {
+                    isGeneratingPDF = true
+                }
+            }
             
             defer {
-                Task { await MainActor.run { isGeneratingPDF = false } }
+                Task {
+                    await MainActor.run {
+                        withAnimation {
+                            isGeneratingPDF = false
+                        }
+                    }
+                }
             }
 
             let pdfGenerator = PDFGenerator()

@@ -17,30 +17,34 @@ struct ContentView: View {
     var body: some View {
         Group {
             if !isAppLockEnabled || isUnlocked {
-                TabView(selection: $selectedTab) {
-                    HomeView()
-                        .tabItem {
-                            Label("Home", systemImage: "house.fill")
-                        }
-                        .tag(0)
+                ZStack(alignment: .bottom) {
+                    // Main TabView
+                    TabView(selection: $selectedTab) {
+                        HomeView()
+                            .tabItem {
+                                Label("Home", systemImage: "house.fill")
+                            }
+                            .tag(0)
 
-                    AnalysisView()
-                        .tabItem {
-                            Label("Analysis", systemImage: "chart.pie.fill")
-                        }
-                        .tag(1)
+                        AnalysisView()
+                            .tabItem {
+                                Label("Analysis", systemImage: "chart.bar.fill")
+                            }
+                            .tag(1)
 
-                    ProfileView()
-                        .tabItem {
-                            Label("Profile", systemImage: "person.crop.circle.fill")
-                        }
-                        .tag(2)
+                        ProfileView()
+                            .tabItem {
+                                Label("Profile", systemImage: "person.crop.circle.fill")
+                            }
+                            .tag(2)
 
-                    HistoryView()
-                        .tabItem {
-                            Label("History", systemImage: "clock.fill")
-                        }
-                        .tag(3)
+                        HistoryView()
+                            .tabItem {
+                                Label("History", systemImage: "clock.fill")
+                            }
+                            .tag(3)
+                    }
+                    .tint(Color.brandMagenta) // Modern accent color
                 }
             } else {
                 LockedView(onUnlock: authenticate)
@@ -65,7 +69,9 @@ struct ContentView: View {
     private func authenticate() {
         authService.authenticate { success in
             if success {
-                isUnlocked = true
+                withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
+                    isUnlocked = true
+                }
             }
         }
     }
