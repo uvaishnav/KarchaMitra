@@ -24,7 +24,8 @@ struct AnalysisTrendsView: View {
 
         for expense in expenses {
             if let month = calendar.date(from: calendar.dateComponents([.year, .month], from: expense.date)) {
-                spendingByMonth[month, default: 0] += expense.amount
+                let netAmount = expense.amount - expense.sharedParticipants.reduce(0) { $0 + $1.amountPaid }
+                spendingByMonth[month, default: 0] += netAmount
             }
         }
 
@@ -48,10 +49,12 @@ struct AnalysisTrendsView: View {
         
         let dictionary = Dictionary(grouping: recentExpenses, by: { $0.category })
         
-        return dictionary.compactMap { (category, expenses) -> CategorySpending? in
+        return dictionary.compactMap { (category, expensesInCategory) -> CategorySpending? in
             guard let category = category else { return nil }
-            let totalAmount = expenses.reduce(0) { $0 + $1.amount }
-            return CategorySpending(categoryName: category.name, amount: totalAmount, categoryType: category.type)
+            let grossSpent = expensesInCategory.reduce(0) { $0 + $1.amount }
+            let totalRecovered = expensesInCategory.flatMap { $0.sharedParticipants }.reduce(0) { $0 + $1.amountPaid }
+            let netAmount = grossSpent - totalRecovered
+            return CategorySpending(categoryName: category.name, amount: netAmount, categoryType: category.type)
         }.sorted(by: { $0.amount > $1.amount })
     }
 

@@ -20,10 +20,12 @@ struct AnalysisCategoriesView: View {
     private var categorySpendingData: [CategorySpendingInfo] {
         let dictionary = Dictionary(grouping: monthlyExpenses, by: { $0.category })
         
-        return dictionary.compactMap { (category, expenses) -> CategorySpendingInfo? in
+        return dictionary.compactMap { (category, expensesInCategory) -> CategorySpendingInfo? in
             guard let category = category else { return nil }
-            let totalAmount = expenses.reduce(0) { $0 + $1.amount }
-            return CategorySpendingInfo(id: category.id, name: category.name, iconName: category.iconName, amount: totalAmount, category: category)
+            let grossSpent = expensesInCategory.reduce(0) { $0 + $1.amount }
+            let totalRecovered = expensesInCategory.flatMap { $0.sharedParticipants }.reduce(0) { $0 + $1.amountPaid }
+            let netAmount = grossSpent - totalRecovered
+            return CategorySpendingInfo(id: category.id, name: category.name, iconName: category.iconName, amount: netAmount, category: category)
         }.sorted(by: { $0.amount > $1.amount })
     }
     
@@ -45,10 +47,11 @@ struct AnalysisCategoriesView: View {
             $0.category?.id == category.id && $0.date >= sevenDaysAgo
         }
         
-        // Sum expenses for each day
+        // Sum net expenses for each day
         for expense in categoryExpenses {
             let startOfDay = calendar.startOfDay(for: expense.date)
-            dailyTotals[startOfDay, default: 0] += expense.amount
+            let netAmount = expense.amount - expense.sharedParticipants.reduce(0) { $0 + $1.amountPaid }
+            dailyTotals[startOfDay, default: 0] += netAmount
         }
         
         return dailyTotals.map { DailySpending(date: $0.key, amount: $0.value) }.sorted(by: { $0.date < $1.date })

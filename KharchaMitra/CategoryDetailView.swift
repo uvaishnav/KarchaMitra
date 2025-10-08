@@ -18,7 +18,8 @@ struct CategoryDetailView: View {
 
         for expense in categoryExpenses {
             if let month = calendar.date(from: calendar.dateComponents([.year, .month], from: expense.date)) {
-                spendingByMonth[month, default: 0] += expense.amount
+                let netAmount = expense.amount - expense.sharedParticipants.reduce(0) { $0 + $1.amountPaid }
+                spendingByMonth[month, default: 0] += netAmount
             }
         }
 
@@ -55,7 +56,7 @@ struct CategoryDetailView: View {
                                 .foregroundColor(.secondary)
                         }
                         Spacer()
-                        Text(expense.amount.toCurrency())
+                        Text((expense.amount - expense.sharedParticipants.reduce(0) { $0 + $1.amountPaid }).toCurrency())
                     }
                 }
             }

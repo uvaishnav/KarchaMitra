@@ -113,7 +113,7 @@ struct AddExpenseView: View {
                                         .foregroundColor(.textSecondary)
                                     
                                     HStack(spacing: AppSpacing.sm) {
-                                        Picker("", selection: $selectedCategory) {
+                                        Picker(selection: $selectedCategory) {
                                             Text("Select Category").tag(nil as Category?)
                                             ForEach(categories.sorted(by: { $0.name < $1.name })) { category in
                                                 HStack {
@@ -121,6 +121,17 @@ struct AddExpenseView: View {
                                                     Text(category.name)
                                                 }.tag(category as Category?)
                                             }
+                                        } label: {
+                                            HStack {
+                                                if let selectedCategory {
+                                                    Text(selectedCategory.iconName ?? "📦")
+                                                    Text(selectedCategory.name)
+                                                } else {
+                                                    Text("Select Category")
+                                                }
+                                            }
+                                            .frame(maxWidth: .infinity, alignment: .leading)
+                                            .padding(EdgeInsets(top: 0, leading: 4, bottom: 0, trailing: 0))
                                         }
                                         .pickerStyle(.menu)
                                         .frame(maxWidth: .infinity)
