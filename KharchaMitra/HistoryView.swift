@@ -22,6 +22,7 @@ enum HistoryItem: Identifiable, Hashable {
 }
 
 struct HistoryView: View {
+    @Environment(\.modelContext) private var modelContext
     @Query(sort: \Expense.date, order: .reverse) var expenses: [Expense]
     @Query(sort: \Settlement.date, order: .reverse) var settlements: [Settlement]
 
@@ -107,28 +108,22 @@ struct HistoryView: View {
                 if filteredItems.isEmpty {
                     EmptyHistoryView()
                 } else {
-                    ScrollView(showsIndicators: false) {
-                        LazyVStack(spacing: AppSpacing.sm) {
-                            ForEach(Array(filteredItems.enumerated()), id: \.element.id) { index, item in
-                                switch item {
-                                case .expense(let expense):
-                                    ModernExpenseRow(expense: expense)
-                                        .transition(.asymmetric(
-                                            insertion: .move(edge: .trailing).combined(with: .opacity),
-                                            removal: .move(edge: .leading).combined(with: .opacity)
-                                        ))
-                                case .settlement(let settlement):
-                                    ModernSettlementRow(settlement: settlement)
-                                        .transition(.asymmetric(
-                                            insertion: .move(edge: .trailing).combined(with: .opacity),
-                                            removal: .move(edge: .leading).combined(with: .opacity)
-                                        ))
-                                }
+                    List {
+                        ForEach(filteredItems) { item in
+                            switch item {
+                            case .expense(let expense):
+                                ModernExpenseRow(expense: expense)
+                            case .settlement(let settlement):
+                                ModernSettlementRow(settlement: settlement)
                             }
                         }
-                        .padding(.horizontal, AppSpacing.md)
-                        .padding(.bottom, AppSpacing.xl)
+                        .onDelete(perform: deleteItems)
+                        .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                        .listRowSeparator(.hidden)
+                        .listRowBackground(Color.clear)
                     }
+                    .listStyle(.plain)
+                    .padding(.bottom, AppSpacing.xl)
                 }
             }
             .background(
@@ -220,6 +215,16 @@ struct HistoryView: View {
             }
         }
         .presentationDetents([.large])
+    }
+    
+    private func deleteItems(at offsets: IndexSet) {
+        for index in offsets {
+            let item = filteredItems[index]
+            if case .expense(let expense) = item {
+                modelContext.delete(expense)
+            }
+            // Settlements are intentionally not deleted to preserve financial records
+        }
     }
     
     private func generateAndShareCSV() {

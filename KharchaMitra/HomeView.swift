@@ -183,24 +183,47 @@ struct HomeView: View {
         guard let userSettings = settings.first else { return }
         let calendar = Calendar.current
         let now = Date()
-        guard let lastUpdate = userSettings.lastBufferUpdate else {
+
+        guard var lastUpdate = userSettings.lastBufferUpdate else {
             userSettings.lastBufferUpdate = now
             return
         }
-        
-        if !calendar.isDate(now, equalTo: lastUpdate, toGranularity: .month) {
-            guard let previousMonthDate = calendar.date(byAdding: .month, value: -1, to: now) else { return }
-            let previousMonthExpenses = expenses.filter {
-                calendar.isDate($0.date, equalTo: previousMonthDate, toGranularity: .month)
+
+        // Don't run if we're still in the same month as the last update
+        if calendar.isDate(now, equalTo: lastUpdate, toGranularity: .month) {
+            return
+        }
+
+        while !calendar.isDate(lastUpdate, equalTo: now, toGranularity: .month) {
+            // Calculate surplus for the month of `lastUpdate`
+            let expensesForMonth = expenses.filter {
+                calendar.isDate($0.date, equalTo: lastUpdate, toGranularity: .month) &&
+                $0.category?.type != .UTR
             }
-            let totalSpentLastMonth = previousMonthExpenses.reduce(0) { $0 + $1.amount }
-            let surplus = userSettings.expenseLimit - totalSpentLastMonth
+            
+            let grossSpent = expensesForMonth.reduce(0) { $0 + $1.amount }
+            let totalRecovered = expensesForMonth
+                .flatMap { $0.sharedParticipants }
+                .reduce(0) { $0 + $1.amountPaid }
+            let netSpent = grossSpent - totalRecovered
+            
+            let surplus = userSettings.expenseLimit - netSpent
             
             if surplus > 0 {
                 userSettings.savingBuffer += surplus
             }
-            userSettings.lastBufferUpdate = now
+
+            // Move to the next month
+            guard let nextMonth = calendar.date(byAdding: .month, value: 1, to: lastUpdate) else {
+                // This should not happen, but as a safeguard:
+                userSettings.lastBufferUpdate = now
+                break
+            }
+            lastUpdate = nextMonth
         }
+
+        // After the loop, set the final update date
+        userSettings.lastBufferUpdate = now
     }
 }
 
@@ -276,7 +299,7 @@ struct SpendingSummaryCard: View {
             // Saving Buffer
             VStack(alignment: .trailing, spacing: AppSpacing.xs) {
                 HStack(spacing: 6) {
-                    Text("Saved")
+                    Text("Saving Buffer")
                         .font(.subheadline)
                         .fontWeight(.medium)
                         .foregroundColor(.textSecondary)

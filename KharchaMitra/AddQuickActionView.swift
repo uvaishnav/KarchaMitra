@@ -188,7 +188,7 @@ struct AddQuickActionView: View {
                                         .fontWeight(.semibold)
                                         .foregroundColor(.textSecondary)
                                     
-                                    Picker("", selection: $selectedCategory) {
+                                    Picker(selection: $selectedCategory) {
                                         Text("None").tag(nil as Category?)
                                         ForEach(categories.sorted(by: { $0.name < $1.name })) { category in
                                             HStack {
@@ -196,6 +196,17 @@ struct AddQuickActionView: View {
                                                 Text(category.name)
                                             }.tag(category as Category?)
                                         }
+                                    } label: {
+                                        HStack {
+                                            if let selectedCategory {
+                                                Text(selectedCategory.iconName ?? "📦")
+                                                Text(selectedCategory.name)
+                                            } else {
+                                                Text("None")
+                                            }
+                                        }
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                        .padding(EdgeInsets(top: 0, leading: 4, bottom: 0, trailing: 0))
                                     }
                                     .pickerStyle(.menu)
                                     .frame(maxWidth: .infinity)

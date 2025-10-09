@@ -20,23 +20,36 @@ struct AnalysisOverviewView: View {
 
     private var wantVsNeedSpending: [CategorySpending] {
         let dictionary = Dictionary(grouping: monthlyExpenses, by: { $0.category?.type ?? .need })
-        return dictionary.map {
-            CategorySpending(categoryName: $0.key.displayName, amount: $0.value.reduce(0) { $0 + $1.amount }, categoryType: $0.key)
+        return dictionary.map { (type, expensesInType) in
+            let grossSpent = expensesInType.reduce(0) { $0 + $1.amount }
+            let totalRecovered = expensesInType.flatMap { $0.sharedParticipants }.reduce(0) { $0 + $1.amountPaid }
+            let netSpent = grossSpent - totalRecovered
+            return CategorySpending(categoryName: type.displayName, amount: netSpent, categoryType: type)
         }
     }
     
     private var recurringVsOneTimeSpending: [SpendingType] {
-        let recurringAmount = monthlyExpenses.filter { $0.recurringTemplate != nil }.reduce(0) { $0 + $1.amount }
-        let oneTimeAmount = monthlyExpenses.filter { $0.recurringTemplate == nil }.reduce(0) { $0 + $1.amount }
+        let recurringExpenses = monthlyExpenses.filter { $0.recurringTemplate != nil }
+        let oneTimeExpenses = monthlyExpenses.filter { $0.recurringTemplate == nil }
+        
+        let recurringGross = recurringExpenses.reduce(0) { $0 + $1.amount }
+        let recurringRecovered = recurringExpenses.flatMap { $0.sharedParticipants }.reduce(0) { $0 + $1.amountPaid }
+        let recurringNet = recurringGross - recurringRecovered
+        
+        let oneTimeGross = oneTimeExpenses.reduce(0) { $0 + $1.amount }
+        let oneTimeRecovered = oneTimeExpenses.flatMap { $0.sharedParticipants }.reduce(0) { $0 + $1.amountPaid }
+        let oneTimeNet = oneTimeGross - oneTimeRecovered
         
         return [
-            SpendingType(name: "Recurring", amount: recurringAmount),
-            SpendingType(name: "One-Time", amount: oneTimeAmount)
+            SpendingType(name: "Recurring", amount: recurringNet),
+            SpendingType(name: "One-Time", amount: oneTimeNet)
         ]
     }
     
     private var totalSpending: Double {
-        monthlyExpenses.reduce(0) { $0 + $1.amount }
+        let grossSpent = monthlyExpenses.reduce(0) { $0 + $1.amount }
+        let totalRecovered = monthlyExpenses.flatMap { $0.sharedParticipants }.reduce(0) { $0 + $1.amountPaid }
+        return grossSpent - totalRecovered
     }
     
     private var monthlySpendingAgainstLimit: Double {
