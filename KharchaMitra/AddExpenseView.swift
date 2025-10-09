@@ -118,7 +118,7 @@ struct AddExpenseView: View {
                                             ForEach(categories.sorted(by: { $0.name < $1.name })) { category in
                                                 HStack {
                                                     Text(category.iconName ?? "📦")
-                                                    Text(category.name).foregroundColor(.primary)
+                                                    Text(category.name)
                                                 }.tag(category as Category?)
                                             }
                                         } label: {
