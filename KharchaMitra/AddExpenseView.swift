@@ -116,12 +116,10 @@ struct AddExpenseView: View {
                                         Picker(selection: $selectedCategory) {
                                             Text("Select Category").tag(nil as Category?)
                                             ForEach(categories.sorted(by: { $0.name < $1.name })) { category in
-                                                Label {
-                                                    Text(category.name)
-                                                } icon: {
+                                                HStack {
                                                     Text(category.iconName ?? "📦")
-                                                }
-                                                .tag(category as Category?)
+                                                    Text(category.name)
+                                                }.tag(category as Category?)
                                             }
                                         } label: {
                                             HStack {
