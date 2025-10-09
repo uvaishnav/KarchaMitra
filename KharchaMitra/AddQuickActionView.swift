@@ -191,16 +191,12 @@ struct AddQuickActionView: View {
                                     Picker(selection: $selectedCategory) {
                                         Text("None").tag(nil as Category?)
                                         ForEach(categories.sorted(by: { $0.name < $1.name })) { category in
-                                            HStack {
-                                                Text(category.iconName ?? "📦")
-                                                Text(category.name).foregroundColor(.primary)
-                                            }.tag(category as Category?)
+                                            CategoryPickerLabel(category: category).tag(category as Category?)
                                         }
                                     } label: {
                                         HStack {
                                             if let selectedCategory {
-                                                Text(selectedCategory.iconName ?? "📦")
-                                                Text(selectedCategory.name)
+                                                CategoryPickerLabel(category: selectedCategory)
                                             } else {
                                                 Text("None")
                                             }
