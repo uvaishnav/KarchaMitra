@@ -2,7 +2,7 @@ import SwiftUI
 import SwiftData
 
 struct CategorySpendingInfo: Identifiable {
-    let id: Category.ID
+    let id: Category.PersistentID
     let name: String
     let iconName: String
     let amount: Double
@@ -25,7 +25,7 @@ struct AnalysisCategoriesView: View {
             let grossSpent = expensesInCategory.reduce(0) { $0 + $1.amount }
             let totalRecovered = expensesInCategory.flatMap { $0.sharedParticipants }.reduce(0) { $0 + $1.amountPaid }
             let netAmount = grossSpent - totalRecovered
-            return CategorySpendingInfo(id: category.id, name: category.name, iconName: category.iconName, amount: netAmount, category: category)
+            return CategorySpendingInfo(id: category.persistentModelID, name: category.name, iconName: category.iconName, amount: netAmount, category: category)
         }.sorted(by: { $0.amount > $1.amount })
     }
     
@@ -44,7 +44,7 @@ struct AnalysisCategoriesView: View {
         // Get expenses for the category in the last 7 days
         let sevenDaysAgo = calendar.date(byAdding: .day, value: -7, to: Date())!
         let categoryExpenses = expenses.filter {
-            $0.category?.id == category.id && $0.date >= sevenDaysAgo
+            $0.category?.persistentModelID == category.persistentModelID && $0.date >= sevenDaysAgo
         }
         
         // Sum net expenses for each day
