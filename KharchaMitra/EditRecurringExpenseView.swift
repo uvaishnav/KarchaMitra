@@ -30,7 +30,12 @@ struct EditRecurringExpenseView: View {
                 Picker("Category", selection: $selectedCategory) {
                     Text("None").tag(nil as Category?)
                     ForEach(categories.sorted(by: { $0.name < $1.name })) { category in
-                        Text(category.name).tag(category as Category?)
+                        Label {
+                            Text(category.name)
+                        } icon: {
+                            Text(category.iconName ?? "📦")
+                        }
+                        .tag(category as Category?)
                     }
                 }
 
