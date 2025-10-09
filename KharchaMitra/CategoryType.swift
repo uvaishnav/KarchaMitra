@@ -1,12 +1,12 @@
 
 import Foundation
 
-enum CategoryType: Codable, Hashable {
+public enum CategoryType: Codable, Hashable {
     case want
     case need
     case UTR
 
-    var displayName: String {
+    public var displayName: String {
         switch self {
         case .need:
             return "Need"
